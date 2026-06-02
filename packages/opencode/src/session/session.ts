@@ -666,7 +666,9 @@ export const layer: Layer.Layer<
       const rows = yield* db
         .select()
         .from(SessionTable)
-        .where(and(eq(SessionTable.parent_id, parentID)))
+        // #region btw
+        .where(and(eq(SessionTable.parent_id, parentID), isNull(SessionTable.time_archived)))
+        // #endregion btw
         .all()
         .pipe(Effect.orDie)
       return rows.map(fromRow)

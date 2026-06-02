@@ -261,7 +261,15 @@ export interface Hooks {
   "permission.ask"?: (input: Permission, output: { status: "ask" | "deny" | "allow" }) => Promise<void>
   "command.execute.before"?: (
     input: { command: string; sessionID: string; arguments: string },
-    output: { parts: Part[] },
+    output: {
+      parts: Part[]
+      // #region btw
+      handled?: {
+        message?: string
+        metadata?: Record<string, unknown>
+      }
+      // #endregion btw
+    },
   ) => Promise<void>
   "tool.execute.before"?: (
     input: { tool: string; sessionID: string; callID: string },

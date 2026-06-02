@@ -40,6 +40,21 @@ const awaitDeferred = <T>(deferred: Deferred.Deferred<T>, message: string) =>
 
 const remove = (id: SessionID) => SessionNs.use.remove(id)
 
+describe("session children", () => {
+  it.instance("excludes archived child sessions", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionNs.Service
+      const parent = yield* session.create({ title: "parent" })
+      const visible = yield* session.create({ title: "visible", parentID: parent.id })
+      const archived = yield* session.create({ title: "archived", parentID: parent.id })
+
+      yield* session.setArchived({ sessionID: archived.id, time: Date.now() })
+
+      expect((yield* session.children(parent.id)).map((item) => item.id)).toEqual([visible.id])
+    }),
+  )
+})
+
 describe("session.created event", () => {
   it.instance("should emit session.created event when session is created", () =>
     Effect.gen(function* () {

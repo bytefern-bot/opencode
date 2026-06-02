@@ -58,6 +58,7 @@ import {
   type WorkspaceSelection,
 } from "../dialog-workspace-create"
 import { DialogWorkspaceUnavailable } from "../dialog-workspace-unavailable"
+import { DialogBtw } from "../dialog-btw"
 import { useArgs } from "@tui/context/args"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { type WorkspaceStatus } from "../workspace-label"
@@ -88,6 +89,25 @@ export type PromptRef = {
   focus(): void
   submit(): void
 }
+
+// #region btw
+type BtwHandledMetadata = {
+  kind: "btw"
+  sessionID: string
+  question: string
+}
+
+function isBtwHandledMetadata(value: unknown): value is BtwHandledMetadata {
+  if (!value || typeof value !== "object") return false
+  if (!("kind" in value) || value.kind !== "btw") return false
+  return (
+    "sessionID" in value &&
+    typeof value.sessionID === "string" &&
+    "question" in value &&
+    typeof value.question === "string"
+  )
+}
+// #endregion btw
 
 const money = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -1171,21 +1191,41 @@ export function Prompt(props: PromptProps) {
       const restOfInput = firstLineEnd === -1 ? "" : inputText.slice(firstLineEnd + 1)
       const args = firstLineArgs.join(" ") + (restOfInput ? "\n" + restOfInput : "")
 
-      void sdk.client.session.command({
-        sessionID,
-        command: command.slice(1),
-        arguments: args,
-        agent: agent.name,
-        model: `${selectedModel.providerID}/${selectedModel.modelID}`,
-        messageID,
-        variant,
-        parts: nonTextParts
-          .filter((x) => x.type === "file")
-          .map((x) => ({
-            id: PartID.ascending(),
-            ...x,
-          })),
-      })
+      // #region btw
+      void sdk.client.session
+        .command({
+          sessionID,
+          command: command.slice(1),
+          arguments: args,
+          agent: agent.name,
+          model: `${selectedModel.providerID}/${selectedModel.modelID}`,
+          messageID,
+          variant,
+          parts: nonTextParts
+            .filter((x) => x.type === "file")
+            .map((x) => ({
+              id: PartID.ascending(),
+              ...x,
+            })),
+        })
+        .then((result) => {
+          const handled = result.data?.parts
+            .filter((part) => part.type === "text")
+            .map((part) => part.metadata)
+            .find(isBtwHandledMetadata)
+          if (!handled) return
+          dialog.setSize("large")
+          dialog.replace(() => (
+            <DialogBtw
+              sessionID={handled.sessionID}
+              parentSessionID={sessionID}
+              question={handled.question}
+              time={Date.now()}
+            />
+          ))
+        })
+        .catch(() => {})
+      // #endregion btw
     } else {
       sdk.client.session
         .prompt({

@@ -22,6 +22,7 @@ import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder, HttpApiError, HttpApiSchema } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
 import {
+  BtwPayload,
   CommandPayload,
   DiffQuery,
   ForkPayload,
@@ -196,7 +197,9 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
         })
       }
       if (ctx.payload.time?.archived !== undefined) {
-        yield* session.setArchived({ sessionID: ctx.params.sessionID, time: ctx.payload.time.archived })
+        // #region btw
+        yield* session.setArchived({ sessionID: ctx.params.sessionID, time: ctx.payload.time.archived ?? undefined })
+        // #endregion btw
       }
       return yield* requireSession(ctx.params.sessionID)
     })
@@ -328,6 +331,56 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       return HttpApiSchema.NoContent.make()
     })
 
+    // #region btw
+    const btw = Effect.fn("SessionHttpApi.btw")(function* (ctx: {
+      params: { sessionID: SessionID }
+      payload: typeof BtwPayload.Type
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      const question = ctx.payload.question.trim()
+      if (!question) return yield* new HttpApiError.BadRequest({})
+      const forked = yield* SessionError.mapStorageNotFound(
+        session.fork({ sessionID: ctx.params.sessionID, messageID: ctx.payload.messageID }),
+      )
+      yield* session.setTitle({ sessionID: forked.id, title: `#BTW ${question.slice(0, 80)}` })
+      yield* session.setArchived({ sessionID: forked.id, time: Date.now() })
+      yield* promptSvc
+        .prompt({
+          sessionID: forked.id,
+          model: ctx.payload.model,
+          agent: ctx.payload.agent,
+          variant: ctx.payload.variant,
+          // #region btw
+          system: [
+            "This is a /btw side question.",
+            "Answer the user's question using only the current conversation context.",
+            "Keep the response focused and concise. Do not use tools. Do not modify files or project state.",
+          ].join(" "),
+          tools: { "*": false },
+          // #endregion btw
+          parts: [
+            {
+              type: "text",
+              text: question,
+            },
+          ],
+        })
+        .pipe(
+          Effect.catchCause((cause) =>
+            Effect.gen(function* () {
+              yield* Effect.logError("btw prompt failed").pipe(Effect.annotateLogs({ sessionID: forked.id, cause }))
+              yield* events.publish(Session.Event.Error, {
+                sessionID: forked.id,
+                error: new NamedError.Unknown({ message: Cause.pretty(cause) }).toObject(),
+              })
+            }),
+          ),
+          Effect.forkIn(scope, { startImmediately: true }),
+        )
+      return { sessionID: forked.id, message: `Started /btw side question in session ${forked.id}.` }
+    })
+    // #endregion btw
+
     const command = Effect.fn("SessionHttpApi.command")(function* (ctx: {
       params: { sessionID: SessionID }
       payload: typeof CommandPayload.Type
@@ -430,6 +483,9 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("summarize", summarize)
       .handle("prompt", prompt)
       .handle("promptAsync", promptAsync)
+      // #region btw
+      .handle("btw", btw)
+      // #endregion btw
       .handle("command", command)
       .handle("shell", shell)
       .handle("revert", revert)

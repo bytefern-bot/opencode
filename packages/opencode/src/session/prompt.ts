@@ -1387,21 +1387,26 @@ export const layer = Layer.effect(
             const bypassAgentCheck = lastUserMsg?.parts.some((p) => p.type === "agent") ?? false
             const promptOps = yield* ops()
 
-            const tools = yield* SessionTools.resolve({
-              agent,
-              session,
-              model,
-              processor: handle,
-              bypassAgentCheck,
-              messages: msgs,
-              promptOps,
-            }).pipe(
-              Effect.provideService(Plugin.Service, plugin),
-              Effect.provideService(Permission.Service, permission),
-              Effect.provideService(ToolRegistry.Service, registry),
-              Effect.provideService(MCP.Service, mcp),
-              Effect.provideService(Truncate.Service, truncate),
-            )
+            // #region btw
+            const tools: Record<string, AITool> =
+              disablesAllTools(lastUser.tools)
+                ? {}
+                : yield* SessionTools.resolve({
+                    agent,
+                    session,
+                    model,
+                    processor: handle,
+                    bypassAgentCheck,
+                    messages: msgs,
+                    promptOps,
+                  }).pipe(
+                    Effect.provideService(Plugin.Service, plugin),
+                    Effect.provideService(Permission.Service, permission),
+                    Effect.provideService(ToolRegistry.Service, registry),
+                    Effect.provideService(MCP.Service, mcp),
+                    Effect.provideService(Truncate.Service, truncate),
+                  )
+            // #endregion btw
 
             if (lastUser.format?.type === "json_schema") {
               tools["StructuredOutput"] = createStructuredOutputTool({
@@ -1441,7 +1446,14 @@ export const layer = Layer.effect(
               instruction.system().pipe(Effect.orDie),
               MessageV2.toModelMessagesEffect(msgs, model),
             ])
-            const system = [...env, ...instructions, ...(skills ? [skills] : [])]
+            const system = [
+              ...env,
+              ...instructions,
+              // #region btw
+              ...(lastUser.system ? [lastUser.system] : []),
+              // #endregion btw
+              ...(skills ? [skills] : []),
+            ]
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
             const result = yield* handle.process({
@@ -1607,18 +1619,56 @@ export const layer = Layer.effect(
           : yield* currentModel(input.sessionID)
         : taskModel
 
-      yield* plugin.trigger(
+      const commandHook = yield* plugin.trigger(
         "command.execute.before",
         { command: input.command, sessionID: input.sessionID, arguments: input.arguments },
-        { parts },
+        {
+          parts,
+          // #region btw
+          handled: undefined as { message?: string; metadata?: Record<string, unknown> } | undefined,
+          // #endregion btw
+        },
       )
+
+      // #region btw
+      if (commandHook.handled) {
+        const messageID = input.messageID ?? MessageID.ascending()
+        return {
+          info: {
+            id: messageID,
+            sessionID: input.sessionID,
+            role: "user" as const,
+            time: {
+              created: Date.now(),
+            },
+            agent: userAgent,
+            model: {
+              providerID: userModel.providerID,
+              modelID: userModel.modelID,
+              variant: input.variant,
+            },
+          },
+          parts: [
+            {
+              id: PartID.ascending(),
+              sessionID: input.sessionID,
+              messageID,
+              type: "text" as const,
+              text: commandHook.handled.message ?? `Handled /${input.command}.`,
+              synthetic: true,
+              metadata: commandHook.handled.metadata,
+            },
+          ],
+        } satisfies SessionLegacy.WithParts
+      }
+      // #endregion btw
 
       const result = yield* prompt({
         sessionID: input.sessionID,
         messageID: input.messageID,
         model: userModel,
         agent: userAgent,
-        parts,
+        parts: commandHook.parts,
         variant: input.variant,
       })
       yield* events.publish(Command.Event.Executed, {
@@ -1704,6 +1754,11 @@ export const PromptInput = Schema.Struct({
   ),
 })
 export type PromptInput = Schema.Schema.Type<typeof PromptInput>
+
+/** @internal Exported for testing */
+export function disablesAllTools(tools?: Record<string, boolean>) {
+  return tools?.["*"] === false
+}
 
 export class LoopInput extends Schema.Class<LoopInput>("SessionPrompt.LoopInput")({
   sessionID: SessionID,

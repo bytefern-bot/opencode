@@ -4,7 +4,7 @@ import { Database } from "@opencode-ai/core/database/database"
 import { eq } from "drizzle-orm"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { FetchHttpClient } from "effect/unstable/http"
-import { expect } from "bun:test"
+import { expect, test } from "bun:test"
 import { Cause, Deferred, Duration, Effect, Exit, Fiber, Layer } from "effect"
 import path from "path"
 import { fileURLToPath, pathToFileURL } from "url"
@@ -33,7 +33,7 @@ import { SessionCompaction } from "../../src/session/compaction"
 import { SessionSummary } from "../../src/session/summary"
 import { Instruction } from "../../src/session/instruction"
 import { SessionProcessor } from "../../src/session/processor"
-import { SessionPrompt } from "../../src/session/prompt"
+import { disablesAllTools, SessionPrompt } from "../../src/session/prompt"
 import { SessionRevert } from "../../src/session/revert"
 import { SessionRunState } from "../../src/session/run-state"
 import { MessageID, PartID, SessionID } from "../../src/session/schema"
@@ -511,6 +511,13 @@ it.instance("loop calls LLM and returns assistant message", () =>
     expect(yield* llm.hits).toHaveLength(1)
   }),
 )
+
+test("disablesAllTools recognizes wildcard tool disable marker", () => {
+  expect(disablesAllTools({ "*": false })).toBe(true)
+  expect(disablesAllTools({ "*": true })).toBe(false)
+  expect(disablesAllTools({ read: false })).toBe(false)
+  expect(disablesAllTools()).toBe(false)
+})
 
 noLLMServer.instance.skip(
   "prompt emits v2 prompted and synthetic events (v2 projector disabled)",
