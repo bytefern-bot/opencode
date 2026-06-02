@@ -1071,7 +1071,7 @@ export const layer = Layer.effect(
         Effect.map((x) => x.flat().map(assign)),
       )
 
-      yield* plugin.trigger(
+      const messageHook = yield* plugin.trigger(
         "chat.message",
         {
           sessionID: input.sessionID,
@@ -1080,10 +1080,17 @@ export const layer = Layer.effect(
           messageID: input.messageID,
           variant: input.variant,
         },
-        { message: info, parts: resolvedParts },
+        {
+          message: info,
+          parts: resolvedParts,
+          // #region btw
+          noReply: false,
+          // #endregion btw
+        },
       )
+      const messageInfo = messageHook.message
 
-      const parts = yield* Effect.forEach(resolvedParts, (part) =>
+      const parts = yield* Effect.forEach(messageHook.parts, (part) =>
         part.type === "file" && part.mime.startsWith("image/")
           ? image.normalize(part).pipe(
               Effect.catchIf(
@@ -1094,13 +1101,13 @@ export const layer = Layer.effect(
           : Effect.succeed(part),
       )
 
-      const parsed = decodeMessageInfo(info, { errors: "all", propertyOrder: "original" })
+      const parsed = decodeMessageInfo(messageInfo, { errors: "all", propertyOrder: "original" })
       if (Exit.isFailure(parsed)) {
         log.error("invalid user message before save", {
           sessionID: input.sessionID,
-          messageID: info.id,
-          agent: info.agent,
-          model: info.model,
+          messageID: messageInfo.id,
+          agent: messageInfo.agent,
+          model: messageInfo.model,
           cause: Cause.pretty(parsed.cause),
         })
       }
@@ -1109,7 +1116,7 @@ export const layer = Layer.effect(
         if (Exit.isSuccess(p)) return
         log.error("invalid user part before save", {
           sessionID: input.sessionID,
-          messageID: info.id,
+          messageID: messageInfo.id,
           partID: part.id,
           partType: part.type,
           index,
@@ -1118,7 +1125,7 @@ export const layer = Layer.effect(
         })
       })
 
-      yield* sessions.updateMessage(info)
+      yield* sessions.updateMessage(messageInfo)
       for (const part of parts) yield* sessions.updatePart(part)
       const nextPrompt = parts.reduce(
         (result, part) => {
@@ -1190,7 +1197,7 @@ export const layer = Layer.effect(
       if (flags.experimentalEventSystem) {
         yield* events.publish(SessionEvent.Prompted, {
           sessionID: input.sessionID,
-          timestamp: DateTime.makeUnsafe(info.time.created),
+          timestamp: DateTime.makeUnsafe(messageInfo.time.created),
           prompt: {
             text: nextPrompt.text.join("\n"),
             files: nextPrompt.files,
@@ -1204,13 +1211,19 @@ export const layer = Layer.effect(
         if (flags.experimentalEventSystem) {
           yield* events.publish(SessionEvent.Synthetic, {
             sessionID: input.sessionID,
-            timestamp: DateTime.makeUnsafe(info.time.created),
+            timestamp: DateTime.makeUnsafe(messageInfo.time.created),
             text,
           })
         }
       }
 
-      return { info, parts }
+      return {
+        info: messageInfo,
+        parts,
+        // #region btw
+        noReply: messageHook.noReply === true,
+        // #endregion btw
+      }
     }, Effect.scoped)
 
     const prompt: (input: PromptInput) => Effect.Effect<SessionLegacy.WithParts, Image.Error> = Effect.fn(
@@ -1230,7 +1243,9 @@ export const layer = Layer.effect(
         yield* sessions.setPermission({ sessionID: session.id, permission: permissions })
       }
 
-      if (input.noReply === true) return message
+      // #region btw
+      if (input.noReply === true || message.noReply === true) return message
+      // #endregion btw
       return yield* loop({ sessionID: input.sessionID })
     })
 
@@ -1610,45 +1625,8 @@ export const layer = Layer.effect(
       const commandHook = yield* plugin.trigger(
         "command.execute.before",
         { command: input.command, sessionID: input.sessionID, arguments: input.arguments },
-        {
-          parts,
-          // #region btw
-          handled: undefined as { message?: string } | undefined,
-          // #endregion btw
-        },
+        { parts },
       )
-
-      // #region btw
-      if (commandHook.handled) {
-        const messageID = input.messageID ?? MessageID.ascending()
-        return {
-          info: {
-            id: messageID,
-            sessionID: input.sessionID,
-            role: "user",
-            time: {
-              created: Date.now(),
-            },
-            agent: userAgent,
-            model: {
-              providerID: userModel.providerID,
-              modelID: userModel.modelID,
-              variant: input.variant,
-            },
-          },
-          parts: [
-            {
-              id: PartID.ascending(),
-              sessionID: input.sessionID,
-              messageID,
-              type: "text",
-              text: commandHook.handled.message ?? `Handled /${input.command}.`,
-              synthetic: true,
-            },
-          ],
-        }
-      }
-      // #endregion btw
 
       const result = yield* prompt({
         sessionID: input.sessionID,

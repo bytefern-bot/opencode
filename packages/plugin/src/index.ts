@@ -239,7 +239,13 @@ export interface Hooks {
       messageID?: string
       variant?: string
     },
-    output: { message: UserMessage; parts: Part[] },
+    output: {
+      message: UserMessage
+      parts: Part[]
+      // #region btw
+      noReply?: boolean
+      // #endregion btw
+    },
   ) => Promise<void>
   /**
    * Modify parameters sent to LLM
@@ -261,12 +267,7 @@ export interface Hooks {
   "permission.ask"?: (input: Permission, output: { status: "ask" | "deny" | "allow" }) => Promise<void>
   "command.execute.before"?: (
     input: { command: string; sessionID: string; arguments: string },
-    output: {
-      parts: Part[]
-      // #region btw
-      handled?: { message?: string }
-      // #endregion btw
-    },
+    output: { parts: Part[] },
   ) => Promise<void>
   "tool.execute.before"?: (
     input: { tool: string; sessionID: string; callID: string },
