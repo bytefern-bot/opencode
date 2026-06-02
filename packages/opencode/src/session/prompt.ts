@@ -1607,18 +1607,55 @@ export const layer = Layer.effect(
           : yield* currentModel(input.sessionID)
         : taskModel
 
-      yield* plugin.trigger(
+      const commandHook = yield* plugin.trigger(
         "command.execute.before",
         { command: input.command, sessionID: input.sessionID, arguments: input.arguments },
-        { parts },
+        {
+          parts,
+          // #region btw
+          handled: undefined as { message?: string } | undefined,
+          // #endregion btw
+        },
       )
+
+      // #region btw
+      if (commandHook.handled) {
+        const messageID = input.messageID ?? MessageID.ascending()
+        return {
+          info: {
+            id: messageID,
+            sessionID: input.sessionID,
+            role: "user",
+            time: {
+              created: Date.now(),
+            },
+            agent: userAgent,
+            model: {
+              providerID: userModel.providerID,
+              modelID: userModel.modelID,
+              variant: input.variant,
+            },
+          },
+          parts: [
+            {
+              id: PartID.ascending(),
+              sessionID: input.sessionID,
+              messageID,
+              type: "text",
+              text: commandHook.handled.message ?? `Handled /${input.command}.`,
+              synthetic: true,
+            },
+          ],
+        }
+      }
+      // #endregion btw
 
       const result = yield* prompt({
         sessionID: input.sessionID,
         messageID: input.messageID,
         model: userModel,
         agent: userAgent,
-        parts,
+        parts: commandHook.parts,
         variant: input.variant,
       })
       yield* events.publish(Command.Event.Executed, {

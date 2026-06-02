@@ -14,6 +14,7 @@ import { SessionRunState } from "@/session/run-state"
 import { SessionStatus } from "@/session/status"
 import { SessionSummary } from "@/session/summary"
 import { Todo } from "@/session/todo"
+import { ToolRegistry } from "@/tool/registry"
 import { MessageID, PartID, SessionID } from "@/session/schema"
 import { NamedError } from "@opencode-ai/core/util/error"
 import { Cause, Effect, Option, Schema, Scope } from "effect"
@@ -22,6 +23,7 @@ import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder, HttpApiError, HttpApiSchema } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
 import {
+  BtwPayload,
   CommandPayload,
   DiffQuery,
   ForkPayload,
@@ -56,6 +58,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const permissionSvc = yield* Permission.Service
     const statusSvc = yield* SessionStatus.Service
     const todoSvc = yield* Todo.Service
+    const toolRegistry = yield* ToolRegistry.Service
     const summary = yield* SessionSummary.Service
     const events = yield* EventV2Bridge.Service
     const scope = yield* Scope.Scope
@@ -328,6 +331,53 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       return HttpApiSchema.NoContent.make()
     })
 
+    // #region btw
+    const btw = Effect.fn("SessionHttpApi.btw")(function* (ctx: {
+      params: { sessionID: SessionID }
+      payload: typeof BtwPayload.Type
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      const question = ctx.payload.question.trim()
+      if (!question) return yield* new HttpApiError.BadRequest({})
+      const forked = yield* SessionError.mapStorageNotFound(
+        session.fork({ sessionID: ctx.params.sessionID, messageID: ctx.payload.messageID }),
+      )
+      yield* session.setTitle({ sessionID: forked.id, title: `#BTW ${question.slice(0, 80)}` })
+      yield* promptSvc
+        .prompt({
+          sessionID: forked.id,
+          model: ctx.payload.model,
+          agent: ctx.payload.agent,
+          variant: ctx.payload.variant,
+          tools: Object.fromEntries((yield* toolRegistry.ids()).map((id) => [id, false])),
+          parts: [
+            {
+              type: "text",
+              text: [
+                "<system-reminder>This is a /btw side question. Answer the user's question without using tools.",
+                "Keep the response focused and concise. Do not modify files or project state.</system-reminder>",
+                "",
+                question,
+              ].join("\n"),
+            },
+          ],
+        })
+        .pipe(
+          Effect.catchCause((cause) =>
+            Effect.gen(function* () {
+              yield* Effect.logError("btw prompt failed").pipe(Effect.annotateLogs({ sessionID: forked.id, cause }))
+              yield* events.publish(Session.Event.Error, {
+                sessionID: forked.id,
+                error: new NamedError.Unknown({ message: Cause.pretty(cause) }).toObject(),
+              })
+            }),
+          ),
+          Effect.forkIn(scope, { startImmediately: true }),
+        )
+      return { sessionID: forked.id, message: `Started /btw side question in session ${forked.id}.` }
+    })
+    // #endregion btw
+
     const command = Effect.fn("SessionHttpApi.command")(function* (ctx: {
       params: { sessionID: SessionID }
       payload: typeof CommandPayload.Type
@@ -430,6 +480,9 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("summarize", summarize)
       .handle("prompt", prompt)
       .handle("promptAsync", promptAsync)
+      // #region btw
+      .handle("btw", btw)
+      // #endregion btw
       .handle("command", command)
       .handle("shell", shell)
       .handle("revert", revert)
