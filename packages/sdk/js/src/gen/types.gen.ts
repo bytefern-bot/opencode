@@ -2729,6 +2729,55 @@ export type SessionPromptAsyncResponses = {
 
 export type SessionPromptAsyncResponse = SessionPromptAsyncResponses[keyof SessionPromptAsyncResponses]
 
+
+export type SessionBtwData = {
+  body: {
+    messageID?: string
+    model?: {
+      providerID: string
+      modelID: string
+    }
+    agent?: string
+    variant?: string
+    question: string
+  }
+  path: {
+    /**
+     * Session ID
+     */
+    id: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/session/{id}/btw"
+}
+
+export type SessionBtwErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+}
+
+export type SessionBtwError = SessionBtwErrors[keyof SessionBtwErrors]
+
+export type SessionBtwResponses = {
+  /**
+   * Side question started
+   */
+  200: {
+    sessionID: string
+    message: string
+  }
+}
+
+export type SessionBtwResponse = SessionBtwResponses[keyof SessionBtwResponses]
+
 export type SessionCommandData = {
   body?: {
     messageID?: string

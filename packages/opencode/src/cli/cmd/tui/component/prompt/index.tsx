@@ -58,6 +58,7 @@ import {
   type WorkspaceSelection,
 } from "../dialog-workspace-create"
 import { DialogWorkspaceUnavailable } from "../dialog-workspace-unavailable"
+import { DialogBtw } from "../dialog-btw"
 import { useArgs } from "@tui/context/args"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { type WorkspaceStatus } from "../workspace-label"
@@ -1171,21 +1172,55 @@ export function Prompt(props: PromptProps) {
       const restOfInput = firstLineEnd === -1 ? "" : inputText.slice(firstLineEnd + 1)
       const args = firstLineArgs.join(" ") + (restOfInput ? "\n" + restOfInput : "")
 
-      void sdk.client.session.command({
-        sessionID,
-        command: command.slice(1),
-        arguments: args,
-        agent: agent.name,
-        model: `${selectedModel.providerID}/${selectedModel.modelID}`,
-        messageID,
-        variant,
-        parts: nonTextParts
-          .filter((x) => x.type === "file")
-          .map((x) => ({
-            id: PartID.ascending(),
-            ...x,
-          })),
-      })
+      // #region btw
+      if (command.slice(1) === "btw") {
+        const result = await sdk.client.session.btw({
+          sessionID,
+          question: args,
+          agent: agent.name,
+          model: {
+            providerID: selectedModel.providerID,
+            modelID: selectedModel.modelID,
+          },
+          variant,
+        })
+        if (result.error || !result.data) {
+          toast.show({
+            title: "Failed to start /btw",
+            message: errorMessage(result.error ?? "no response"),
+            variant: "error",
+          })
+        }
+        if (result.data) {
+          dialog.setSize("large")
+          dialog.replace(() => (
+            <DialogBtw
+              sessionID={result.data.sessionID}
+              parentSessionID={sessionID}
+              question={args.trim() || "(empty question)"}
+              time={Date.now()}
+            />
+          ))
+        }
+      }
+      if (command.slice(1) !== "btw") {
+        void sdk.client.session.command({
+          sessionID,
+          command: command.slice(1),
+          arguments: args,
+          agent: agent.name,
+          model: `${selectedModel.providerID}/${selectedModel.modelID}`,
+          messageID,
+          variant,
+          parts: nonTextParts
+            .filter((x) => x.type === "file")
+            .map((x) => ({
+              id: PartID.ascending(),
+              ...x,
+            })),
+        })
+      }
+      // #endregion btw
     } else {
       sdk.client.session
         .prompt({

@@ -67,6 +67,24 @@ export const SummarizePayload = Schema.Struct({
   auto: Schema.optional(Schema.Boolean),
 })
 export const PromptPayload = Schema.Struct(Struct.omit(SessionPrompt.PromptInput.fields, ["sessionID"]))
+// #region btw
+export const BtwPayload = Schema.Struct({
+  messageID: Schema.optional(MessageID),
+  model: Schema.optional(
+    Schema.Struct({
+      providerID: ProviderV2.ID,
+      modelID: ProviderV2.ModelID,
+    }),
+  ),
+  agent: Schema.optional(Schema.String),
+  variant: Schema.optional(Schema.String),
+  question: Schema.String,
+})
+export const BtwResponse = Schema.Struct({
+  sessionID: SessionID,
+  message: Schema.String,
+})
+// #endregion btw
 export const CommandPayload = Schema.Struct(Struct.omit(SessionPrompt.CommandInput.fields, ["sessionID"]))
 export const ShellPayload = Schema.Struct(Struct.omit(SessionPrompt.ShellInput.fields, ["sessionID"]))
 export const RevertPayload = Schema.Struct(Struct.omit(SessionRevert.RevertInput.fields, ["sessionID"]))
@@ -93,6 +111,9 @@ export const SessionPaths = {
   summarize: `${root}/:sessionID/summarize`,
   prompt: `${root}/:sessionID/message`,
   promptAsync: `${root}/:sessionID/prompt_async`,
+  // #region btw
+  btw: `${root}/:sessionID/btw`,
+  // #endregion btw
   command: `${root}/:sessionID/command`,
   shell: `${root}/:sessionID/shell`,
   revert: `${root}/:sessionID/revert`,
@@ -339,6 +360,21 @@ export const SessionApi = HttpApi.make("session")
               "Create and send a new message to a session asynchronously, starting the session if needed and returning immediately.",
           }),
         ),
+        // #region btw
+        HttpApiEndpoint.post("btw", SessionPaths.btw, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          payload: BtwPayload,
+          success: described(BtwResponse, "Side question started"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.btw",
+            summary: "Ask side question",
+            description: "Fork the session and ask a side question asynchronously without continuing the parent prompt.",
+          }),
+        ),
+        // #endregion btw
         HttpApiEndpoint.post("command", SessionPaths.command, {
           params: { sessionID: SessionID },
           query: WorkspaceRoutingQuery,

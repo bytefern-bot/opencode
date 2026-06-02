@@ -239,7 +239,13 @@ export interface Hooks {
       messageID?: string
       variant?: string
     },
-    output: { message: UserMessage; parts: Part[] },
+    output: {
+      message: UserMessage
+      parts: Part[]
+      // #region btw
+      noReply?: boolean
+      // #endregion btw
+    },
   ) => Promise<void>
   /**
    * Modify parameters sent to LLM

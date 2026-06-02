@@ -97,6 +97,9 @@ import type {
   SessionPromptAsyncData,
   SessionPromptAsyncResponses,
   SessionPromptAsyncErrors,
+  SessionBtwData,
+  SessionBtwResponses,
+  SessionBtwErrors,
   SessionCommandData,
   SessionCommandResponses,
   SessionCommandErrors,
@@ -639,6 +642,20 @@ class Session extends _HeyApiClient {
   public promptAsync<ThrowOnError extends boolean = false>(options: Options<SessionPromptAsyncData, ThrowOnError>) {
     return (options.client ?? this._client).post<SessionPromptAsyncResponses, SessionPromptAsyncErrors, ThrowOnError>({
       url: "/session/{id}/prompt_async",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    })
+  }
+
+  /**
+   * Ask a side question in a background fork
+   */
+  public btw<ThrowOnError extends boolean = false>(options: Options<SessionBtwData, ThrowOnError>) {
+    return (options.client ?? this._client).post<SessionBtwResponses, SessionBtwErrors, ThrowOnError>({
+      url: "/session/{id}/btw",
       ...options,
       headers: {
         "Content-Type": "application/json",
