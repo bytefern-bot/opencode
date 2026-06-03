@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>opencode TUI 到 Server API 核心流程</title>
+    <link rel="icon" href="data:," />
+    <style>
+      :root {
+        --bg: #f6f7f4;
+        --ink: #1f2528;
+        --muted: #5f686d;
+        --line: #c9d0ca;
+        --tui: #234f68;
+        --api: #7b4f1f;
+        --server: #2f6d58;
+        --agent: #694f8a;
+        --event: #8b3f46;
+        --card: #ffffff;
+        --soft: #eef1ee;
+        --shadow: 0 12px 32px rgba(31, 37, 40, 0.07);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Microsoft YaHei", sans-serif;
+        letter-spacing: 0;
+      }
+
+      main {
+        width: 1800px;
+        min-height: 1370px;
+        padding: 48px 56px 54px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(247, 249, 247, 0.96)),
+          repeating-linear-gradient(0deg, transparent 0, transparent 31px, rgba(69, 89, 98, 0.045) 32px),
+          repeating-linear-gradient(90deg, transparent 0, transparent 31px, rgba(69, 89, 98, 0.035) 32px);
+      }
+
+      header {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 30px;
+        align-items: end;
+        margin-bottom: 26px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 43px;
+        line-height: 1.08;
+        font-weight: 780;
+      }
+
+      .subtitle {
+        width: 1080px;
+        margin: 13px 0 0;
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1.5;
+      }
+
+      .source-note {
+        display: grid;
+        grid-template-columns: repeat(2, max-content);
+        gap: 9px;
+        padding: 18px 20px;
+        border: 1px solid var(--line);
+        border-left: 7px solid var(--tui);
+        background: rgba(255, 255, 255, 0.84);
+        box-shadow: var(--shadow);
+      }
+
+      code {
+        padding: 2px 5px;
+        border-radius: 4px;
+        background: var(--soft);
+        color: #263238;
+        font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+        font-size: 0.9em;
+      }
+
+      .legend {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 22px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.66);
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 620;
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--accent);
+      }
+
+      .swimlanes {
+        display: grid;
+        grid-template-columns: 300px 330px 340px 340px 300px;
+        gap: 18px;
+        align-items: start;
+      }
+
+      .lane {
+        display: grid;
+        gap: 13px;
+      }
+
+      .lane-title {
+        min-height: 36px;
+        padding: 0 4px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 760;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .card {
+        position: relative;
+        min-height: 122px;
+        padding: 17px 18px 15px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--card);
+        box-shadow: var(--shadow);
+      }
+
+      .card::before {
+        content: "";
+        position: absolute;
+        inset: -1px auto -1px -1px;
+        width: 6px;
+        border-radius: 8px 0 0 8px;
+        background: var(--accent);
+      }
+
+      .card h2 {
+        margin: 0 0 8px;
+        font-size: 20px;
+        line-height: 1.2;
+      }
+
+      .card p,
+      .card li {
+        color: var(--muted);
+        font-size: 13.5px;
+        line-height: 1.46;
+      }
+
+      .card p {
+        margin: 0;
+      }
+
+      .card ul {
+        display: grid;
+        gap: 5px;
+        margin: 11px 0 0;
+        padding-left: 18px;
+      }
+
+      .tui {
+        --accent: var(--tui);
+      }
+
+      .api {
+        --accent: var(--api);
+      }
+
+      .server {
+        --accent: var(--server);
+      }
+
+      .agent {
+        --accent: var(--agent);
+      }
+
+      .event {
+        --accent: var(--event);
+      }
+
+      .flow {
+        margin: 26px 0;
+        padding: 22px 24px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.74);
+      }
+
+      .flow-title {
+        margin-bottom: 15px;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 760;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(10, 1fr);
+        gap: 9px;
+      }
+
+      .step {
+        position: relative;
+        min-height: 106px;
+        padding: 13px 12px 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      .step:not(:last-child)::after {
+        content: "→";
+        position: absolute;
+        top: 38px;
+        right: -13px;
+        z-index: 2;
+        color: #7c8589;
+        font-size: 20px;
+        font-weight: 760;
+      }
+
+      .step strong {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 14px;
+        line-height: 1.2;
+      }
+
+      .step span {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.35;
+      }
+
+      .matrix {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 18px;
+      }
+
+      .section {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+        background: #fff;
+        box-shadow: var(--shadow);
+      }
+
+      .section h2 {
+        margin: 0;
+        padding: 15px 18px;
+        border-bottom: 1px solid var(--line);
+        background: #f0f2ef;
+        font-size: 18px;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 185px 1fr;
+        min-height: 58px;
+        border-top: 1px solid var(--line);
+      }
+
+      .row:first-of-type {
+        border-top: 0;
+      }
+
+      .cell {
+        padding: 13px 15px;
+        font-size: 13px;
+        line-height: 1.42;
+      }
+
+      .cell:first-child {
+        color: var(--ink);
+        font-weight: 720;
+        background: #f7f8f5;
+      }
+
+      .cell:last-child {
+        color: var(--muted);
+      }
+
+      .footer {
+        margin-top: 20px;
+        color: var(--muted);
+        text-align: center;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>opencode TUI 到 Server API 核心流程</h1>
+          <p class="subtitle">
+            从打开 TUI 开始：主线程启动 Worker，TUI 通过 SDK 调用内置 server 或外部 HTTP server；server
+            用 workspace routing 选择目录，再加载 InstanceContext，最后由 SessionPrompt 驱动模型流、工具调用、权限和事件回放。
+          </p>
+        </div>
+        <div class="source-note">
+          <code>cli/cmd/tui/thread.ts</code>
+          <code>cli/cmd/tui/worker.ts</code>
+          <code>cli/cmd/tui/context/sdk.tsx</code>
+          <code>server/routes/instance/httpapi</code>
+          <code>project/instance-store.ts</code>
+          <code>session/prompt.ts</code>
+        </div>
+      </header>
+
+      <div class="legend">
+        <span class="pill"><span class="dot" style="--accent: var(--tui)"></span>TUI 进程</span>
+        <span class="pill"><span class="dot" style="--accent: var(--api)"></span>SDK / HTTP 接口</span>
+        <span class="pill"><span class="dot" style="--accent: var(--server)"></span>服务端 / 实例</span>
+        <span class="pill"><span class="dot" style="--accent: var(--agent)"></span>智能体 / 工具</span>
+        <span class="pill"><span class="dot" style="--accent: var(--event)"></span>事件 / 用户交互</span>
+      </div>
+
+      <section class="swimlanes">
+        <div class="lane">
+          <div class="lane-title">打开 TUI</div>
+          <article class="card tui">
+            <h2>TUI 命令入口</h2>
+            <p>解析 <code>project</code>、<code>--session</code>、<code>--continue</code>、<code>--prompt</code>、model/agent，切换到目标目录。</p>
+          </article>
+          <article class="card tui">
+            <h2>Worker 与传输方式</h2>
+            <p>默认走 in-process RPC：TUI fetch 被转成 worker RPC，再调用 <code>Server.Default().app.fetch</code>。</p>
+          </article>
+          <article class="card tui">
+            <h2>外部服务模式</h2>
+            <p>显式 port/hostname/mDNS 时，worker 调 <code>Server.listen</code>，TUI 直接对 HTTP URL 发请求。</p>
+          </article>
+        </div>
+
+        <div class="lane">
+          <div class="lane-title">SDK 启动加载</div>
+          <article class="card api">
+            <h2>SDK 上下文</h2>
+            <p><code>createOpencodeClient</code> 绑定 baseUrl、directory、headers、fetch；事件用 <code>global.event</code> 或 RPC 转发。</p>
+          </article>
+          <article class="card api">
+            <h2>项目同步</h2>
+            <p>启动时读取 <code>path.get</code> 和 <code>project.current</code>，触发 server 侧 instance 初始化。</p>
+          </article>
+          <article class="card api">
+            <h2>界面状态预加载</h2>
+            <p>阻塞加载 config/providers/agents；后台加载 command、LSP、MCP、formatter、session status、VCS。</p>
+          </article>
+        </div>
+
+        <div class="lane">
+          <div class="lane-title">服务端边界</div>
+          <article class="card server">
+            <h2>HTTP API 路由</h2>
+            <p>所有实例 API 经过 Authorization、WorkspaceRoutingMiddleware 和 InstanceContextMiddleware。</p>
+          </article>
+          <article class="card server">
+            <h2>工作区路由</h2>
+            <p>根据 <code>?workspace</code>、session.workspaceID、<code>?directory</code> 或 <code>x-opencode-directory</code> 决定目标。</p>
+          </article>
+          <article class="card server">
+            <h2>实例加载</h2>
+            <p>按目录缓存 InstanceContext；首次请求会 project discovery，然后运行 bootstrap services。</p>
+          </article>
+        </div>
+
+        <div class="lane">
+          <div class="lane-title">用户提问</div>
+          <article class="card agent">
+            <h2>新建会话</h2>
+            <p>没有 session 时先调 <code>session.create</code>，创建会话并带上 agent/model/workspace。</p>
+          </article>
+          <article class="card agent">
+            <h2>提交消息</h2>
+            <p>普通输入调 <code>session.prompt</code> → <code>POST /session/:id/message</code>；shell 和 slash command 走独立接口。</p>
+          </article>
+          <article class="card agent">
+            <h2>智能体主循环</h2>
+            <p>落库 UserMessage/Part，装配上下文、工具 schema、权限规则，调用 LLM stream 并执行工具循环。</p>
+          </article>
+        </div>
+
+        <div class="lane">
+          <div class="lane-title">交互回路</div>
+          <article class="card event">
+            <h2>事件流</h2>
+            <p><code>GET /event</code> 推送 server.connected、session.next.*、tool.*、permission/question 等事件。</p>
+          </article>
+          <article class="card event">
+            <h2>用户决策</h2>
+            <p>权限弹窗回复 <code>permission.reply</code>；模型提问回复 <code>question.reply</code> 或 reject。</p>
+          </article>
+          <article class="card event">
+            <h2>状态补拉</h2>
+            <p>TUI 通过事件增量更新；必要时再拉 <code>session.get</code>、messages、todo、diff 或 v2 messages。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="flow">
+        <div class="flow-title">端到端请求路径</div>
+        <div class="steps">
+          <div class="step">
+            <strong>1 打开</strong>
+            <span>TUI 主线程解析参数、chdir、启动 Worker</span>
+          </div>
+          <div class="step">
+            <strong>2 传输</strong>
+            <span>内部 RPC fetch 或外部 HTTP server URL</span>
+          </div>
+          <div class="step">
+            <strong>3 客户端</strong>
+            <span>SDKProvider 建立 client 和 event source</span>
+          </div>
+          <div class="step">
+            <strong>4 预加载</strong>
+            <span>project.current、config、provider、agent、session list</span>
+          </div>
+          <div class="step">
+            <strong>5 路由</strong>
+            <span>Authorization + workspace routing + instance context</span>
+          </div>
+          <div class="step">
+            <strong>6 初始化</strong>
+            <span>project.fromDirectory + InstanceBootstrap</span>
+          </div>
+          <div class="step">
+            <strong>7 提交</strong>
+            <span>session.create 后 POST /session/:id/message</span>
+          </div>
+          <div class="step">
+            <strong>8 智能体</strong>
+            <span>SessionPrompt 装配上下文并调用 LLM stream</span>
+          </div>
+          <div class="step">
+            <strong>9 工具</strong>
+            <span>工具执行、permission/question 交互、结果回灌</span>
+          </div>
+          <div class="step">
+            <strong>10 渲染</strong>
+            <span>/event 增量驱动 TUI 渲染和补拉 hydration</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="matrix">
+        <div class="section">
+          <h2>启动阶段 API</h2>
+          <div class="row">
+            <div class="cell"><code>GET /event</code></div>
+            <div class="cell">TUI 最早建立的事件通道；内部模式由 worker 的 <code>global.event</code> RPC 转发。</div>
+          </div>
+          <div class="row">
+            <div class="cell"><code>GET /path</code></div>
+            <div class="cell">返回 home/state/config/worktree/directory，供 TUI 显示当前实例路径。</div>
+          </div>
+          <div class="row">
+            <div class="cell"><code>GET /project/current</code></div>
+            <div class="cell">触发当前目录 Project 解析；必要时加载 git worktree、project id 和 sandbox。</div>
+          </div>
+          <div class="row">
+            <div class="cell">config/provider/agent</div>
+            <div class="cell">加载 <code>config.get</code>、<code>config.providers</code>、<code>provider.list</code>、<code>app.agents</code>。</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>会话与工具 API</h2>
+          <div class="row">
+            <div class="cell"><code>POST /session</code></div>
+            <div class="cell">新问题没有 session 时先创建，写入 agent/model/workspace 等会话元信息。</div>
+          </div>
+          <div class="row">
+            <div class="cell"><code>POST /session/:id/message</code></div>
+            <div class="cell">普通 prompt 主路径；server 返回 message，同时后台通过事件流持续推送增量。</div>
+          </div>
+          <div class="row">
+            <div class="cell"><code>/command</code> / <code>/shell</code></div>
+            <div class="cell">slash command 和 shell mode 分流，最后仍进入 SessionPrompt/SessionRunState 管理。</div>
+          </div>
+          <div class="row">
+            <div class="cell"><code>permission.reply</code></div>
+            <div class="cell">工具 ask/allow/deny 的用户回路；回复后工具继续、失败或阻塞。</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Server 内部边界</h2>
+          <div class="row">
+            <div class="cell">WorkspaceRouting</div>
+            <div class="cell">本地 workspace 变成 directory；远端 workspace 走 HTTP/WebSocket proxy。</div>
+          </div>
+          <div class="row">
+            <div class="cell">InstanceStore</div>
+            <div class="cell">按 canonical directory 缓存启动结果；dispose/reload 会发 server.instance.disposed。</div>
+          </div>
+          <div class="row">
+            <div class="cell">Bootstrap</div>
+            <div class="cell">先 config、plugin，再并发初始化 reference、LSP、format、file watcher、VCS、snapshot、project。</div>
+          </div>
+          <div class="row">
+            <div class="cell">EventV2Bridge</div>
+            <div class="cell">把 session.next.*、tool、permission、question、heartbeat 转成 TUI 可消费的 SSE/RPC 事件。</div>
+          </div>
+        </div>
+      </section>
+
+      <p class="footer">
+        读图重点：TUI 本身不直接跑 Agent。它是 SDK 客户端；真正的项目初始化、会话状态、模型流和工具执行都在 server
+        的 InstanceContext 内完成，再通过事件流同步回 TUI。
+      </p>
+    </main>
+  </body>
+</html>
