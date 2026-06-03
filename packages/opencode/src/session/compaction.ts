@@ -105,6 +105,7 @@ function summaryText(message: SessionLegacy.WithParts) {
 
 function completedCompactions(messages: SessionLegacy.WithParts[]) {
   const users = new Map<MessageID, number>()
+  // A completed compaction is represented by a user compaction part and its summary assistant reply.
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i]
     if (msg.info.role !== "user") continue
@@ -263,6 +264,7 @@ export const layer = Layer.effect(
         { concurrency: 1 },
       )
 
+      // Walk backward through recent turns until the preserved tail fits the token budget.
       let total = 0
       let keep: Tail | undefined
       for (let i = recent.length - 1; i >= 0; i--) {
@@ -396,6 +398,7 @@ export const layer = Layer.effect(
         cfg,
         model,
       })
+      // Prior compaction turns are hidden from the next summary; their latest text is passed as an anchor.
       // Allow plugins to inject context or replace compaction prompt.
       const compacting = yield* plugin.trigger(
         "experimental.session.compacting",

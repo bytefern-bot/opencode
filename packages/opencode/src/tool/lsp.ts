@@ -77,6 +77,7 @@ export const LspTool = Tool.define(
           const available = yield* lsp.hasClients(file)
           if (!available) throw new Error("No LSP server available for this file type.")
 
+          // Opening the document first gives servers a chance to initialize diagnostics and symbols.
           yield* lsp.touchFile(file, "document")
 
           const result: unknown[] = yield* (() => {

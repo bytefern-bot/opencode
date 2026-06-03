@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>opencode 数据流图</title>
+    <link rel="icon" href="data:," />
+    <style>
+      :root {
+        --bg: #f6f7f4;
+        --ink: #1f2528;
+        --muted: #5f686d;
+        --line: #c9d0ca;
+        --input: #234f68;
+        --runtime: #2f6d58;
+        --model: #7b4f1f;
+        --tool: #694f8a;
+        --state: #8b3f46;
+        --card: #ffffff;
+        --soft: #eef1ee;
+        --shadow: 0 12px 32px rgba(31, 37, 40, 0.07);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Microsoft YaHei", sans-serif;
+        letter-spacing: 0;
+      }
+
+      main {
+        width: 1600px;
+        min-height: 1280px;
+        padding: 48px 56px 54px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(247, 249, 247, 0.95)),
+          repeating-linear-gradient(0deg, transparent 0, transparent 31px, rgba(69, 89, 98, 0.045) 32px),
+          repeating-linear-gradient(90deg, transparent 0, transparent 31px, rgba(69, 89, 98, 0.035) 32px);
+      }
+
+      header {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 28px;
+        align-items: end;
+        margin-bottom: 28px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 42px;
+        line-height: 1.08;
+        font-weight: 780;
+      }
+
+      .subtitle {
+        width: 960px;
+        margin: 13px 0 0;
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1.5;
+      }
+
+      .source-note {
+        display: grid;
+        grid-template-columns: repeat(2, max-content);
+        gap: 9px;
+        padding: 18px 20px;
+        border: 1px solid var(--line);
+        border-left: 7px solid var(--input);
+        background: rgba(255, 255, 255, 0.84);
+        box-shadow: var(--shadow);
+      }
+
+      code {
+        padding: 2px 5px;
+        border-radius: 4px;
+        background: var(--soft);
+        color: #263238;
+        font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+        font-size: 0.9em;
+      }
+
+      .legend {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 22px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.66);
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 620;
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--accent);
+      }
+
+      .board {
+        display: grid;
+        grid-template-columns: 278px 318px 322px 278px 230px;
+        gap: 18px;
+        align-items: start;
+      }
+
+      .lane {
+        display: grid;
+        gap: 13px;
+      }
+
+      .lane-title {
+        min-height: 36px;
+        padding: 0 4px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 760;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .card {
+        position: relative;
+        min-height: 118px;
+        padding: 17px 18px 15px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--card);
+        box-shadow: var(--shadow);
+      }
+
+      .card::before {
+        content: "";
+        position: absolute;
+        inset: -1px auto -1px -1px;
+        width: 6px;
+        border-radius: 8px 0 0 8px;
+        background: var(--accent);
+      }
+
+      .card h2 {
+        margin: 0 0 8px;
+        font-size: 20px;
+        line-height: 1.2;
+      }
+
+      .card p,
+      .card li {
+        color: var(--muted);
+        font-size: 13.5px;
+        line-height: 1.46;
+      }
+
+      .card p {
+        margin: 0;
+      }
+
+      .card ul {
+        display: grid;
+        gap: 5px;
+        margin: 11px 0 0;
+        padding-left: 18px;
+      }
+
+      .input {
+        --accent: var(--input);
+      }
+
+      .runtime {
+        --accent: var(--runtime);
+      }
+
+      .model {
+        --accent: var(--model);
+      }
+
+      .tool {
+        --accent: var(--tool);
+      }
+
+      .state {
+        --accent: var(--state);
+      }
+
+      .flow {
+        margin: 26px 0;
+        padding: 22px 24px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.74);
+      }
+
+      .flow-title {
+        margin-bottom: 15px;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 760;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(9, 1fr);
+        gap: 9px;
+      }
+
+      .step {
+        position: relative;
+        min-height: 100px;
+        padding: 13px 12px 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      .step:not(:last-child)::after {
+        content: "→";
+        position: absolute;
+        top: 35px;
+        right: -13px;
+        z-index: 2;
+        color: #7c8589;
+        font-size: 20px;
+        font-weight: 760;
+      }
+
+      .step strong {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 14px;
+        line-height: 1.2;
+      }
+
+      .step span {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.35;
+      }
+
+      .matrix {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 18px;
+      }
+
+      .section {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+        background: #fff;
+        box-shadow: var(--shadow);
+      }
+
+      .section h2 {
+        margin: 0;
+        padding: 15px 18px;
+        border-bottom: 1px solid var(--line);
+        background: #f0f2ef;
+        font-size: 18px;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 142px 1fr;
+        min-height: 58px;
+        border-top: 1px solid var(--line);
+      }
+
+      .row:first-of-type {
+        border-top: 0;
+      }
+
+      .cell {
+        padding: 13px 15px;
+        font-size: 13px;
+        line-height: 1.42;
+      }
+
+      .cell:first-child {
+        color: var(--ink);
+        font-weight: 720;
+        background: #f7f8f5;
+      }
+
+      .cell:last-child {
+        color: var(--muted);
+      }
+
+      .footer {
+        margin-top: 20px;
+        color: var(--muted);
+        text-align: center;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>opencode 数据流图</h1>
+          <p class="subtitle">
+            Life of a Prompt：用户输入先进入持久化消息模型，再由主循环装配上下文、调用模型、处理 stream
+            事件、执行工具，并根据结果继续、压缩或结束。
+          </p>
+        </div>
+        <div class="source-note">
+          <code>session/prompt.ts</code>
+          <code>session/processor.ts</code>
+          <code>session/llm.ts</code>
+          <code>tool/registry.ts</code>
+          <code>session/compaction.ts</code>
+          <code>snapshot/index.ts</code>
+        </div>
+      </header>
+
+      <div class="legend">
+        <span class="pill"><span class="dot" style="--accent: var(--input)"></span>input/message</span>
+        <span class="pill"><span class="dot" style="--accent: var(--runtime)"></span>runtime/context</span>
+        <span class="pill"><span class="dot" style="--accent: var(--model)"></span>model/stream</span>
+        <span class="pill"><span class="dot" style="--accent: var(--tool)"></span>tool loop</span>
+        <span class="pill"><span class="dot" style="--accent: var(--state)"></span>state/compaction</span>
+      </div>
+
+      <section class="board">
+        <div class="lane">
+          <div class="lane-title">input and storage</div>
+          <article class="card input">
+            <h2>PromptInput</h2>
+            <p>键盘输入、slash command、附件、agent 选择和 subtask 统一进入 prompt 入口。</p>
+          </article>
+          <article class="card input">
+            <h2>UserMessage + Part</h2>
+            <p><code>createUserMessage</code> 解析 text、file、resource、agent part，并先写入持久化状态。</p>
+          </article>
+          <article class="card state">
+            <h2>Session Storage</h2>
+            <p>Session、Message、Part、Diff 和 snapshot gitdir 是 UI、恢复、审计与工具回传的共同状态源。</p>
+          </article>
+        </div>
+
+        <div class="lane">
+          <div class="lane-title">runtime assembly</div>
+          <article class="card runtime">
+            <h2>RunLoop 初始化</h2>
+            <p>读取 compacted 历史，定位 lastUser、lastAssistant、pending task，选择 agent 和 model。</p>
+          </article>
+          <article class="card runtime">
+            <h2>Context Assembly</h2>
+            <p>合并 environment、skills、AGENTS/CLAUDE、config instructions、历史消息和权限规则。</p>
+          </article>
+          <article class="card runtime">
+            <h2>ToolRegistry</h2>
+            <p>按模型暴露 apply_patch 或 edit/write，并注入 MCP、plugin 和动态工具描述。</p>
+          </article>
+        </div>
+
+        <div class="lane">
+          <div class="lane-title">model and stream</div>
+          <article class="card model">
+            <h2>LLM.stream</h2>
+            <p>合并 provider、agent、variant 参数，附带 headers、tools、toolChoice 和 telemetry。</p>
+          </article>
+          <article class="card model">
+            <h2>Provider API</h2>
+            <p>OpenAI、Anthropic、Copilot、LiteLLM、GitLab Workflow 通过 SSE 或 provider stream 返回事件。</p>
+          </article>
+          <article class="card model">
+            <h2>SessionProcessor</h2>
+            <p>消费 start、reasoning、text、tool-call、tool-result、finish-step、error 等事件。</p>
+          </article>
+        </div>
+
+        <div class="lane">
+          <div class="lane-title">tool loop</div>
+          <article class="card tool">
+            <h2>Tool Call</h2>
+            <p>AI SDK tool.execute 进入 <code>Tool.Def.execute</code>，完成 schema 解码和 permission ask。</p>
+          </article>
+          <article class="card tool">
+            <h2>Hook + Metadata</h2>
+            <p>执行 plugin before/after，更新 metadata、attachments、title，并截断大输出。</p>
+          </article>
+          <article class="card tool">
+            <h2>Result Feedback</h2>
+            <p>completeToolCall 写 output 或 error；下一轮 runLoop 把 observation 送回模型。</p>
+          </article>
+        </div>
+
+        <div class="lane">
+          <div class="lane-title">gates</div>
+          <article class="card state">
+            <h2>Continue</h2>
+            <p>有 tool call 或需要 replay 时，回到上下文装配，重新进入模型调用。</p>
+          </article>
+          <article class="card state">
+            <h2>Compact</h2>
+            <p>上下文接近窗口时生成 anchored summary，保留 head/tail 并 prune 旧工具输出。</p>
+          </article>
+          <article class="card state">
+            <h2>Finish</h2>
+            <p>保存 completed、tokens、cost、patch、summary，session 进入 idle 或 error/blocked。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="flow">
+        <div class="flow-title">prompt request path</div>
+        <div class="steps">
+          <div class="step">
+            <strong>1 Input</strong>
+            <span>PromptInput.parts 进入 session prompt</span>
+          </div>
+          <div class="step">
+            <strong>2 Persist</strong>
+            <span>UserMessage 和 Part 先落库</span>
+          </div>
+          <div class="step">
+            <strong>3 Init</strong>
+            <span>runLoop 选择 agent、model、历史范围</span>
+          </div>
+          <div class="step">
+            <strong>4 Assemble</strong>
+            <span>指令、工具、权限、provider 参数合并</span>
+          </div>
+          <div class="step">
+            <strong>5 Stream</strong>
+            <span>AI SDK streamText 调用 provider</span>
+          </div>
+          <div class="step">
+            <strong>6 Parts</strong>
+            <span>stream 事件增量写入 message part</span>
+          </div>
+          <div class="step">
+            <strong>7 Tools</strong>
+            <span>执行工具并写回 tool result</span>
+          </div>
+          <div class="step">
+            <strong>8 Gate</strong>
+            <span>判断 continue、compact、blocked、finish</span>
+          </div>
+          <div class="step">
+            <strong>9 Idle</strong>
+            <span>完成后 session 回到可恢复状态</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="matrix">
+        <div class="section">
+          <h2>关键分层</h2>
+          <div class="row">
+            <div class="cell">message model</div>
+            <div class="cell">不是临时内存 transcript，而是 session/message/part 驱动的持久化状态。</div>
+          </div>
+          <div class="row">
+            <div class="cell">runtime loop</div>
+            <div class="cell">负责并发、cancel、agent/model 选择、上下文装配和循环 gate。</div>
+          </div>
+          <div class="row">
+            <div class="cell">provider edge</div>
+            <div class="cell">ProviderTransform 在请求前适配模型参数、消息格式和输出 token 上限。</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>工具边界</h2>
+          <div class="row">
+            <div class="cell">permission</div>
+            <div class="cell">工具执行前按规则 ask/allow/deny，结果记录在 tool part 状态里。</div>
+          </div>
+          <div class="row">
+            <div class="cell">plugin hook</div>
+            <div class="cell">before/after hook 可以调整行为、记录 metadata 或改变展示信息。</div>
+          </div>
+          <div class="row">
+            <div class="cell">feedback</div>
+            <div class="cell">工具结果不直接结束流程，而是成为下一轮模型输入的一部分。</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>长上下文</h2>
+          <div class="row">
+            <div class="cell">summary</div>
+            <div class="cell">压缩生成 anchored summary，保留最近轮次和关键任务状态。</div>
+          </div>
+          <div class="row">
+            <div class="cell">prune</div>
+            <div class="cell">旧工具输出可裁剪，避免把低价值大文本持续带入上下文窗口。</div>
+          </div>
+          <div class="row">
+            <div class="cell">replay</div>
+            <div class="cell">必要时 replay 上一次用户请求，让压缩后的上下文继续完成任务。</div>
+          </div>
+        </div>
+      </section>
+
+      <p class="footer">
+        核心校准：opencode 的 Agent Runtime 由持久化 session state 驱动；工具循环、压缩和恢复都围绕同一组
+        message part 展开。
+      </p>
+    </main>
+  </body>
+</html>

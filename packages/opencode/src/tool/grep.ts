@@ -69,6 +69,7 @@ export const GrepTool = Tool.define(
           const cwd = info?.type === "Directory" ? search : path.dirname(search)
           const file = info?.type === "Directory" ? undefined : [path.relative(cwd, search)]
 
+          // Ripgrep runs from a stable cwd; single-file searches become a relative file filter.
           const result = yield* rg.search({
             cwd,
             pattern: params.pattern,
@@ -108,6 +109,7 @@ export const GrepTool = Tool.define(
             return [{ ...row, mtime }]
           })
 
+          // Recent files are more likely to be relevant to the active task.
           matches.sort((a, b) => b.mtime - a.mtime)
 
           const limit = 100

@@ -262,6 +262,7 @@ export const layer = Layer.effect(
         for (const server of Object.values(s.servers)) {
           if (server.extensions.length && !server.extensions.includes(extension)) continue
 
+          // Server root is part of the cache key so monorepos can reuse one client per root.
           const root = await server.root(file, ctx)
           if (!root) continue
           if (s.broken.has(root + server.id)) continue
@@ -283,6 +284,7 @@ export const layer = Layer.effect(
           const task = schedule(server, root, root + server.id)
           s.spawning.set(root + server.id, task)
 
+          // Share an in-flight spawn between concurrent requests for the same server/root.
           task.finally(() => {
             if (s.spawning.get(root + server.id) === task) {
               s.spawning.delete(root + server.id)
@@ -358,6 +360,7 @@ export const layer = Layer.effect(
             const after = Date.now()
             const version = await client.notify.open({ path: input })
             if (!diagnostics) return
+            // Wait only for diagnostics produced after this open notification.
             return client.waitForDiagnostics({
               path: input,
               version,

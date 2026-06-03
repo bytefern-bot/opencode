@@ -235,6 +235,7 @@ export const ReadTool = Tool.define(
       if (!stat) return yield* miss(filepath)
 
       if (stat.type === "Directory") {
+        // Directory reads use the same offset/limit contract as file reads.
         const items = yield* list(filepath)
         const limit = params.limit ?? DEFAULT_READ_LIMIT
         const offset = params.offset || 1
@@ -262,6 +263,7 @@ export const ReadTool = Tool.define(
         }
       }
 
+      // Reading a file can also load nearby instruction files for this specific message.
       const loaded = yield* instruction.resolve(ctx.messages, filepath, ctx.messageID)
       const sample = yield* readSample(filepath, Number(stat.size), SAMPLE_BYTES)
 
@@ -300,6 +302,7 @@ export const ReadTool = Tool.define(
         )
       }
 
+      // Text output is paged by both line count and bytes to keep tool results bounded.
       let output = [`<path>${filepath}</path>`, `<type>file</type>`, "<content>\n"].join("\n")
       output += file.raw.map((line, i) => `${i + file.offset}: ${line}`).join("\n")
 

@@ -86,6 +86,8 @@ export const layer = Layer.effect(
       const { ruleset, ...request } = input
       let needsAsk = false
 
+      // Every requested pattern must clear the ruleset. A single deny blocks
+      // the call; a single ask creates one pending request for the whole call.
       for (const pattern of request.patterns) {
         const rule = evaluate(request.permission, pattern, ruleset, approved)
         log.info("evaluated", { permission: request.permission, pattern, action: rule })
@@ -159,6 +161,8 @@ export const layer = Layer.effect(
       yield* Deferred.succeed(existing.deferred, undefined)
       if (input.reply === "once") return
 
+      // "always" persists allow rules, then resolves compatible pending calls
+      // from the same session without asking again.
       for (const pattern of existing.info.always) {
         approved.push({
           permission: existing.info.permission,

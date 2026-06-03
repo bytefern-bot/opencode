@@ -53,6 +53,7 @@ export const GlobTool = Tool.define(
 
           const limit = 100
           let truncated = false
+          // Collect one extra entry so the tool can report truncation without loading the whole tree.
           const files = yield* rg.files({ cwd: search, glob: [params.pattern], signal: ctx.abort }).pipe(
             Stream.mapEffect((file) =>
               Effect.gen(function* () {
@@ -75,6 +76,7 @@ export const GlobTool = Tool.define(
             truncated = true
             files.length = limit
           }
+          // Present recent files first to bias discovery toward actively edited code.
           files.sort((a, b) => b.mtime - a.mtime)
 
           const output = []

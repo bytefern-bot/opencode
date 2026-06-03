@@ -7,6 +7,10 @@ node_modules
 .idea
 .vscode
 .codex
+.agents
+.claude
+.playwright
+.playwright-cli
 *~
 playground
 tmp

@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>opencode backend model map</title>
+    <style>
+      :root {
+        --bg: #f6f7f4;
+        --ink: #1f2528;
+        --muted: #5f686d;
+        --line: #c9d0ca;
+        --server: #234f68;
+        --routing: #7b4f1f;
+        --instance: #2f6d58;
+        --data: #694f8a;
+        --event: #8b3f46;
+        --card: #ffffff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        width: 1440px;
+        min-height: 1000px;
+        padding: 44px 52px 52px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 34px;
+        line-height: 1.15;
+        font-weight: 760;
+      }
+
+      .subtitle {
+        width: 880px;
+        margin: 12px 0 28px;
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.55;
+      }
+
+      .legend {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 24px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.66);
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 620;
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+      }
+
+      .board {
+        display: grid;
+        grid-template-columns: 270px 270px 330px 350px;
+        gap: 24px;
+        align-items: start;
+      }
+
+      .lane {
+        position: relative;
+        display: grid;
+        gap: 14px;
+      }
+
+      .lane-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 42px;
+        padding: 0 4px;
+        font-size: 14px;
+        font-weight: 760;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .card {
+        position: relative;
+        min-height: 126px;
+        padding: 18px 18px 16px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--card);
+        box-shadow: 0 12px 32px rgba(31, 37, 40, 0.07);
+      }
+
+      .card::before {
+        content: "";
+        position: absolute;
+        inset: -1px auto -1px -1px;
+        width: 6px;
+        border-radius: 8px 0 0 8px;
+        background: var(--accent);
+      }
+
+      .card h2 {
+        margin: 0 0 8px;
+        font-size: 21px;
+        line-height: 1.2;
+      }
+
+      .card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.48;
+      }
+
+      .card ul {
+        display: grid;
+        gap: 5px;
+        margin: 12px 0 0;
+        padding-left: 18px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.38;
+      }
+
+      .server {
+        --accent: var(--server);
+      }
+
+      .routing {
+        --accent: var(--routing);
+      }
+
+      .instance {
+        --accent: var(--instance);
+      }
+
+      .data {
+        --accent: var(--data);
+      }
+
+      .event {
+        --accent: var(--event);
+      }
+
+      .flow {
+        position: relative;
+        margin: 28px 0;
+        padding: 22px 24px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      .flow-title {
+        margin-bottom: 16px;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 760;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 10px;
+      }
+
+      .step {
+        position: relative;
+        min-height: 88px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      .step:not(:last-child)::after {
+        content: "→";
+        position: absolute;
+        top: 30px;
+        right: -14px;
+        z-index: 2;
+        color: #7c8589;
+        font-size: 20px;
+        font-weight: 760;
+      }
+
+      .step strong {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 14px;
+      }
+
+      .step span {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.35;
+      }
+
+      .matrix {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        margin-top: 28px;
+      }
+
+      .table {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+        background: #fff;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 170px 1fr;
+        min-height: 54px;
+        border-top: 1px solid var(--line);
+      }
+
+      .row:first-child {
+        border-top: 0;
+      }
+
+      .cell {
+        padding: 13px 15px;
+        font-size: 13px;
+        line-height: 1.42;
+      }
+
+      .cell:first-child {
+        color: var(--ink);
+        font-weight: 720;
+        background: #f0f2ef;
+      }
+
+      .cell:last-child {
+        color: var(--muted);
+      }
+
+      .section-title {
+        margin: 0 0 12px;
+        font-size: 19px;
+      }
+
+      code {
+        padding: 2px 5px;
+        border-radius: 4px;
+        background: #eef1ee;
+        color: #263238;
+        font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+        font-size: 0.92em;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>opencode 后端模型图</h1>
+      <p class="subtitle">
+        这张图把 HTTP 请求从全局控制面到项目实例的路径展开：先判断是否是 server 级能力，再通过 workspace
+        routing 找到目录或远端目标，最后进入 instance 内部的缓存、业务数据和事件系统。
+      </p>
+
+      <div class="legend">
+        <span class="pill"><span class="dot" style="background: var(--server)"></span>server/global</span>
+        <span class="pill"><span class="dot" style="background: var(--routing)"></span>routing/workspace</span>
+        <span class="pill"><span class="dot" style="background: var(--instance)"></span>instance/runtime</span>
+        <span class="pill"><span class="dot" style="background: var(--data)"></span>project/session data</span>
+        <span class="pill"><span class="dot" style="background: var(--event)"></span>event/sync</span>
+      </div>
+
+      <section class="board">
+        <div class="lane">
+          <div class="lane-title">server scope</div>
+          <article class="card server">
+            <h2>Global</h2>
+            <p>整个 opencode server 进程的控制面，不绑定某个项目目录。</p>
+            <ul>
+              <li><code>/global/health</code></li>
+              <li><code>/global/config</code></li>
+              <li><code>/global/event</code></li>
+              <li><code>/global/dispose</code> 清理所有 instances</li>
+            </ul>
+          </article>
+
+          <article class="card event">
+            <h2>GlobalBus</h2>
+            <p>全局事件出口，聚合所有 instance 的事件，并携带 directory、project、workspace 信息。</p>
+          </article>
+        </div>
+
+        <div class="lane">
+          <div class="lane-title">request routing</div>
+          <article class="card routing">
+            <h2>Workspace Routing</h2>
+            <p>把请求路由到本地目录或远端 workspace。</p>
+            <ul>
+              <li><code>?directory=...</code></li>
+              <li><code>x-opencode-directory</code></li>
+              <li><code>?workspace=...</code></li>
+              <li>session 关联目录</li>
+            </ul>
+          </article>
+
+          <article class="card routing">
+            <h2>Workspace</h2>
+            <p>控制平面概念。它描述目标在哪里：本地 directory，或者一个 remote target。</p>
+          </article>
+        </div>
+
+        <div class="lane">
+          <div class="lane-title">runtime scope</div>
+          <article class="card instance">
+            <h2>Instance</h2>
+            <p>某个 directory/project 的运行上下文，由 <code>InstanceContext</code> 表示。</p>
+            <ul>
+              <li><code>directory</code></li>
+              <li><code>worktree</code></li>
+              <li><code>project</code></li>
+            </ul>
+          </article>
+
+          <article class="card instance">
+            <h2>InstanceStore</h2>
+            <p><code>directory → InstanceContext</code> 的 server 级缓存，负责 load、reload、dispose。</p>
+          </article>
+
+          <article class="card instance">
+            <h2>InstanceState</h2>
+            <p>服务内部的 per-directory 缓存，instance dispose 时会 invalidate。</p>
+          </article>
+        </div>
+
+        <div class="lane">
+          <div class="lane-title">business data</div>
+          <article class="card data">
+            <h2>Project</h2>
+            <p>持久化的项目实体。Instance 运行时会关联一个 project，Session 也通过 projectID 归属项目。</p>
+          </article>
+
+          <article class="card data">
+            <h2>Session</h2>
+            <p>一次对话或任务记录，属于 project/directory，可选地属于 workspace。</p>
+            <ul>
+              <li><code>sessionID</code></li>
+              <li><code>projectID</code></li>
+              <li><code>workspaceID?</code></li>
+              <li><code>directory</code></li>
+            </ul>
+          </article>
+
+          <article class="card event">
+            <h2>Bus / SyncEvent</h2>
+            <p>Bus 是 instance 内运行时事件；SyncEvent 是可持久化、可同步、可投影的状态变更。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="flow">
+        <div class="flow-title">request path</div>
+        <div class="steps">
+          <div class="step">
+            <strong>HTTP request</strong>
+            <span>请求进入 opencode server</span>
+          </div>
+          <div class="step">
+            <strong>Root or Instance</strong>
+            <span>global/control 走 Root API，其余走 Instance API</span>
+          </div>
+          <div class="step">
+            <strong>Workspace Routing</strong>
+            <span>解析 directory、workspace 或 session 归属</span>
+          </div>
+          <div class="step">
+            <strong>InstanceStore</strong>
+            <span>按 directory load 或复用 InstanceContext</span>
+          </div>
+          <div class="step">
+            <strong>InstanceRef</strong>
+            <span>把当前 instance 注入 Effect context</span>
+          </div>
+          <div class="step">
+            <strong>Handler</strong>
+            <span>读写 project、session、file、vcs、provider 等服务</span>
+          </div>
+          <div class="step">
+            <strong>Events</strong>
+            <span>Bus 发布运行时事件，SyncEvent 记录状态变化</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="matrix">
+        <div>
+          <h2 class="section-title">缓存与生命周期</h2>
+          <div class="table">
+            <div class="row">
+              <div class="cell">InstanceStore</div>
+              <div class="cell">缓存 <code>directory → InstanceContext</code>；<code>/instance/dispose</code> 清一个，<code>/global/dispose</code> 清全部。</div>
+            </div>
+            <div class="row">
+              <div class="cell">InstanceState</div>
+              <div class="cell">每个服务自己的 per-directory 状态缓存，比如 Bus、SessionStatus、LSP 相关状态。</div>
+            </div>
+            <div class="row">
+              <div class="cell">dispose</div>
+              <div class="cell">先返回 HTTP response，再由 lifecycle middleware 执行清理，避免当前请求被提前破坏。</div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h2 class="section-title">概念边界</h2>
+          <div class="table">
+            <div class="row">
+              <div class="cell">global</div>
+              <div class="cell">server 级控制面；跨项目；适合配置、升级、全局事件和清理全部实例。</div>
+            </div>
+            <div class="row">
+              <div class="cell">workspace</div>
+              <div class="cell">路由目标；可以映射到本地目录，也可以代理到远端。</div>
+            </div>
+            <div class="row">
+              <div class="cell">instance</div>
+              <div class="cell">某个 directory/project 的运行时上下文；大多数业务 API 都运行在这里。</div>
+            </div>
+            <div class="row">
+              <div class="cell">session</div>
+              <div class="cell">持久化业务数据；表示一次对话或任务，归属于 project/directory/workspace。</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

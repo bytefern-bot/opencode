@@ -146,6 +146,7 @@ export const use = serviceUse(Service)
 
 function env() {
   const env = sanitizedProcessEnv()
+  // Keep searches reproducible even when the user's shell has custom rg config.
   delete env.RIPGREP_CONFIG_PATH
   return env
 }
@@ -210,6 +211,7 @@ function filesArgs(input: FilesInput) {
 }
 
 function searchArgs(input: SearchInput) {
+  // JSON output lets callers decode matches structurally instead of parsing text.
   const args = ["--no-config", "--json", "--hidden", "--glob=!.git/*", "--no-messages"]
   if (input.follow) args.push("--follow")
   if (input.glob) {
@@ -296,6 +298,7 @@ export const layer: Layer.Layer<Service, never, AppFileSystem.Service | ChildPro
           const target = path.join(Global.Path.bin, `rg${process.platform === "win32" ? ".exe" : ""}`)
           if (yield* fs.isFile(target).pipe(Effect.orDie)) return target
 
+          // Fall back to a pinned ripgrep build when the host does not provide one.
           const platformKey = `${process.arch}-${process.platform}` as keyof typeof PLATFORM
           const config = PLATFORM[platformKey]
           if (!config) {

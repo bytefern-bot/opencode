@@ -357,6 +357,7 @@ export const layer = Layer.effect(
       const connectTimeout = mcp.timeout ?? DEFAULT_TIMEOUT
       let lastStatus: Status | undefined
 
+      // Try the modern streamable transport first, then SSE for older MCP servers.
       for (const { name, transport } of transports) {
         const result = yield* connectTransport(transport, connectTimeout).pipe(
           Effect.map((client) => ({ client, transportName: name })),
@@ -679,6 +680,7 @@ export const layer = Layer.effect(
         ([clientName]) => s.status[clientName]?.status === "connected",
       )
 
+      // MCP tool names are namespaced by server to avoid collisions in the model tool list.
       yield* Effect.forEach(
         connectedClients,
         ([clientName, client]) =>

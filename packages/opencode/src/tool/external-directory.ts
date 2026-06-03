@@ -26,6 +26,8 @@ export const assertExternalDirectoryEffect = Effect.fn("Tool.assertExternalDirec
   const full = process.platform === "win32" ? AppFileSystem.normalizePath(target) : target
   if (containsPath(full, ins)) return
 
+  // Workspace paths are normal tool permissions; outside paths need their own
+  // directory-scoped approval so one file grant does not imply the whole system.
   const kind = options?.kind ?? "file"
   const dir = kind === "directory" ? full : path.dirname(full)
   const glob =

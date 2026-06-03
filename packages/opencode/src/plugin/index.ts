@@ -290,6 +290,7 @@ export const layer = Layer.effect(
     >(name: Name, input: Input, output: Output) {
       if (!name) return output
       const s = yield* InstanceState.get(state)
+      // Hooks run in registration order around tool definitions and execution.
       for (const hook of s.hooks) {
         const fn = hook[name] as any
         if (!fn) continue
