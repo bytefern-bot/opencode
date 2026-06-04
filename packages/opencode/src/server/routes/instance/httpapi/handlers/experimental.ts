@@ -5,6 +5,7 @@ import { InstanceState } from "@/effect/instance-state"
 import { MCP } from "@/mcp"
 import { Project } from "@/project/project"
 import { Session } from "@/session/session"
+import { Sdd } from "@/sdd"
 import { ToolJsonSchema } from "@/tool/json-schema"
 import { ToolRegistry } from "@/tool/registry"
 import { Worktree } from "@/worktree"
@@ -12,12 +13,23 @@ import { Effect, Option } from "effect"
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse"
 import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
-import { ConsoleSwitchPayload, SessionListQuery, ToolListQuery, WorktreeApiError } from "../groups/experimental"
+import {
+  ConsoleSwitchPayload,
+  SddChangeCreatePayload,
+  SddInstructionsQuery,
+  SessionListQuery,
+  ToolListQuery,
+  WorktreeApiError,
+} from "../groups/experimental"
 
 function mapWorktreeError<A, R>(self: Effect.Effect<A, Worktree.Error, R>) {
   return self.pipe(
     Effect.mapError((error) => new WorktreeApiError({ name: error._tag, data: { message: error.message } })),
   )
+}
+
+function mapSddError<A, R>(self: Effect.Effect<A, Error, R>) {
+  return self.pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
 }
 
 export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "experimental", (handlers) =>
@@ -28,6 +40,7 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
     const mcp = yield* MCP.Service
     const project = yield* Project.Service
     const registry = yield* ToolRegistry.Service
+    const sdd = yield* Sdd.Service
     const worktreeSvc = yield* Worktree.Service
     const sessions = yield* Session.Service
 
@@ -150,6 +163,49 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       return yield* mcp.resources()
     })
 
+    const sddSchemas = Effect.fn("ExperimentalHttpApi.sddSchemas")(function* () {
+      return yield* mapSddError(sdd.schemas())
+    })
+
+    const sddSchemaValidate = Effect.fn("ExperimentalHttpApi.sddSchemaValidate")(function* (ctx: {
+      params: { schema: string }
+    }) {
+      return yield* mapSddError(sdd.validateSchema(ctx.params.schema))
+    })
+
+    const sddChanges = Effect.fn("ExperimentalHttpApi.sddChanges")(function* () {
+      return yield* mapSddError(sdd.changes())
+    })
+
+    const sddChangeCreate = Effect.fn("ExperimentalHttpApi.sddChangeCreate")(function* (ctx: {
+      payload: typeof SddChangeCreatePayload.Type
+    }) {
+      return yield* mapSddError(sdd.createChange(ctx.payload))
+    })
+
+    const sddChangeStatus = Effect.fn("ExperimentalHttpApi.sddChangeStatus")(function* (ctx: {
+      params: { change: string }
+    }) {
+      return yield* mapSddError(sdd.status(ctx.params.change))
+    })
+
+    const sddChangeInstructions = Effect.fn("ExperimentalHttpApi.sddChangeInstructions")(function* (ctx: {
+      params: { change: string }
+      query: typeof SddInstructionsQuery.Type
+    }) {
+      return yield* mapSddError(sdd.instructions(ctx.params.change, ctx.query.artifact))
+    })
+
+    const sddChangeApply = Effect.fn("ExperimentalHttpApi.sddChangeApply")(function* (ctx: {
+      params: { change: string }
+    }) {
+      return yield* mapSddError(sdd.apply(ctx.params.change))
+    })
+
+    const sddSnapshot = Effect.fn("ExperimentalHttpApi.sddSnapshot")(function* () {
+      return yield* mapSddError(sdd.snapshot())
+    })
+
     return handlers
       .handle("console", getConsole)
       .handle("consoleOrgs", listConsoleOrgs)
@@ -162,5 +218,13 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("worktreeReset", worktreeReset)
       .handle("session", session)
       .handle("resource", resource)
+      .handle("sddSchemas", sddSchemas)
+      .handle("sddSchemaValidate", sddSchemaValidate)
+      .handle("sddChanges", sddChanges)
+      .handle("sddChangeCreate", sddChangeCreate)
+      .handle("sddChangeStatus", sddChangeStatus)
+      .handle("sddChangeInstructions", sddChangeInstructions)
+      .handle("sddChangeApply", sddChangeApply)
+      .handle("sddSnapshot", sddSnapshot)
   }),
 )

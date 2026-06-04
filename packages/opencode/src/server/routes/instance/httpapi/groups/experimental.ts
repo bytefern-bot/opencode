@@ -82,6 +82,17 @@ export const SessionListQuery = Schema.Struct({
   archived: Schema.optional(QueryBoolean),
 })
 
+export const SddInstructionsQuery = Schema.Struct({
+  ...WorkspaceRoutingQueryFields,
+  artifact: Schema.optional(Schema.String),
+})
+export const SddChangeCreatePayload = Schema.Struct({
+  change: Schema.String,
+  schema: Schema.optional(Schema.String),
+  title: Schema.optional(Schema.String),
+  summary: Schema.optional(Schema.String),
+})
+
 export const ExperimentalPaths = {
   console: "/experimental/console",
   consoleOrgs: "/experimental/console/orgs",
@@ -92,6 +103,13 @@ export const ExperimentalPaths = {
   worktreeReset: "/experimental/worktree/reset",
   session: "/experimental/session",
   resource: "/experimental/resource",
+  sddSchema: "/experimental/sdd/schema",
+  sddSchemaValidate: "/experimental/sdd/schema/:schema/validate",
+  sddChange: "/experimental/sdd/change",
+  sddChangeStatus: "/experimental/sdd/change/:change/status",
+  sddChangeInstructions: "/experimental/sdd/change/:change/instructions",
+  sddChangeApply: "/experimental/sdd/change/:change/apply",
+  sddSnapshot: "/experimental/sdd/snapshot",
 } as const
 
 export const ExperimentalApi = HttpApi.make("experimental")
@@ -223,6 +241,99 @@ export const ExperimentalApi = HttpApi.make("experimental")
             identifier: "experimental.resource.list",
             summary: "Get MCP resources",
             description: "Get all available MCP resources from connected servers. Optionally filter by name.",
+          }),
+        ),
+        HttpApiEndpoint.get("sddSchemas", ExperimentalPaths.sddSchema, {
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Unknown, "SDD schemas"),
+          error: HttpApiError.BadRequest,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sdd.schema.list",
+            summary: "List SDD schemas",
+            description: "List project workflow schemas and the built-in spec-driven fallback schema.",
+          }),
+        ),
+        HttpApiEndpoint.get("sddSchemaValidate", ExperimentalPaths.sddSchemaValidate, {
+          query: WorkspaceRoutingQuery,
+          params: { schema: Schema.String },
+          success: described(Schema.Unknown, "SDD schema validation"),
+          error: HttpApiError.BadRequest,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sdd.schema.validate",
+            summary: "Validate SDD schema",
+            description: "Validate one SDD workflow schema by name.",
+          }),
+        ),
+        HttpApiEndpoint.get("sddChanges", ExperimentalPaths.sddChange, {
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Unknown, "SDD changes"),
+          error: HttpApiError.BadRequest,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sdd.change.list",
+            summary: "List SDD changes",
+            description: "List OpenSpec-style SDD changes in the configured changes directory.",
+          }),
+        ),
+        HttpApiEndpoint.post("sddChangeCreate", ExperimentalPaths.sddChange, {
+          query: WorkspaceRoutingQuery,
+          payload: SddChangeCreatePayload,
+          success: described(Schema.Unknown, "SDD change created"),
+          error: HttpApiError.BadRequest,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sdd.change.create",
+            summary: "Create SDD change",
+            description: "Create a new OpenSpec-style SDD change and publish SDD refresh events.",
+          }),
+        ),
+        HttpApiEndpoint.get("sddChangeStatus", ExperimentalPaths.sddChangeStatus, {
+          query: WorkspaceRoutingQuery,
+          params: { change: Schema.String },
+          success: described(Schema.Unknown, "SDD change status"),
+          error: HttpApiError.BadRequest,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sdd.change.status",
+            summary: "Get SDD change status",
+            description: "Return deterministic artifact status for one SDD change.",
+          }),
+        ),
+        HttpApiEndpoint.get("sddChangeInstructions", ExperimentalPaths.sddChangeInstructions, {
+          query: SddInstructionsQuery,
+          params: { change: Schema.String },
+          success: described(Schema.Unknown, "SDD artifact instructions"),
+          error: HttpApiError.BadRequest,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sdd.change.instructions",
+            summary: "Get SDD artifact instructions",
+            description: "Return generation instructions for the next ready or requested artifact.",
+          }),
+        ),
+        HttpApiEndpoint.get("sddChangeApply", ExperimentalPaths.sddChangeApply, {
+          query: WorkspaceRoutingQuery,
+          params: { change: Schema.String },
+          success: described(Schema.Unknown, "SDD apply instructions"),
+          error: HttpApiError.BadRequest,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sdd.change.apply",
+            summary: "Get SDD apply instructions",
+            description: "Return implementation-phase instructions and parsed task state.",
+          }),
+        ),
+        HttpApiEndpoint.get("sddSnapshot", ExperimentalPaths.sddSnapshot, {
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Unknown, "SDD snapshot"),
+          error: HttpApiError.BadRequest,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.sdd.snapshot",
+            summary: "Get SDD snapshot",
+            description: "Return schemas and changes for GUI refresh.",
           }),
         ),
       )

@@ -19,6 +19,7 @@ import { CloudflareAIGatewayAuthPlugin, CloudflareWorkersAuthPlugin } from "./cl
 import { AzureAuthPlugin } from "./azure"
 import { DigitalOceanAuthPlugin } from "./digitalocean"
 import { XaiAuthPlugin } from "./xai"
+import { SddPlugin } from "./sdd"
 import { Effect, Layer, Context } from "effect"
 import { EffectBridge } from "@/effect/bridge"
 import { InstanceState } from "@/effect/instance-state"
@@ -30,6 +31,7 @@ import type { WorkspaceAdapter } from "@/control-plane/types"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { InstallationChannel } from "@opencode-ai/core/installation/version"
+import { Sdd } from "@/sdd"
 
 const log = Log.create({ service: "plugin" })
 
@@ -63,7 +65,13 @@ export function experimentalWebSocketsEnabled(input: { enabled: boolean; channel
 }
 
 // Built-in plugins that are directly imported (not installed from npm)
-function internalPlugins(flags: RuntimeFlags.Info): PluginInstance[] {
+function internalPlugins(
+  flags: RuntimeFlags.Info,
+  publishSdd: (
+    event: "created" | "updated",
+    data: { changeName: string; schemaName: string; changeRoot: string },
+  ) => void,
+): PluginInstance[] {
   return [
     // Temporary rollout: pre-release builds use WebSockets by default; releases require explicit opt-in.
     (input) =>
@@ -78,6 +86,7 @@ function internalPlugins(flags: RuntimeFlags.Info): PluginInstance[] {
     AzureAuthPlugin,
     DigitalOceanAuthPlugin,
     XaiAuthPlugin,
+    (input) => SddPlugin(input, { publish: publishSdd }),
   ]
 }
 
@@ -162,7 +171,14 @@ export const layer = Layer.effect(
           $: typeof Bun === "undefined" ? undefined : Bun.$,
         }
 
-        for (const plugin of flags.disableDefaultPlugins ? [] : internalPlugins(flags)) {
+        const publishSdd = (
+          event: "created" | "updated",
+          data: { changeName: string; schemaName: string; changeRoot: string },
+        ) => {
+          bridge.fork(events.publish(event === "created" ? Sdd.Event.ChangeCreated : Sdd.Event.ChangeUpdated, data))
+        }
+
+        for (const plugin of flags.disableDefaultPlugins ? [] : internalPlugins(flags, publishSdd)) {
           log.info("loading internal plugin", { name: plugin.name })
           const init = yield* Effect.tryPromise({
             try: () => plugin(input),

@@ -145,17 +145,20 @@ describe("experimental HttpApi", () => {
       Effect.gen(function* () {
         const tmp = yield* TestInstance
         const directory = tmp.directory
-        const [consoleState, consoleOrgs, toolList, toolIDs, worktrees, resources] = yield* Effect.all(
-          [
-            request(ExperimentalPaths.console, directory),
-            request(ExperimentalPaths.consoleOrgs, directory),
-            request(`${ExperimentalPaths.tool}?provider=opencode&model=gpt-5`, directory),
-            request(ExperimentalPaths.toolIDs, directory),
-            request(ExperimentalPaths.worktree, directory),
-            request(ExperimentalPaths.resource, directory),
-          ],
-          { concurrency: "unbounded" },
-        )
+        const [consoleState, consoleOrgs, toolList, toolIDs, worktrees, resources, sddSchemas, sddSnapshot] =
+          yield* Effect.all(
+            [
+              request(ExperimentalPaths.console, directory),
+              request(ExperimentalPaths.consoleOrgs, directory),
+              request(`${ExperimentalPaths.tool}?provider=opencode&model=gpt-5`, directory),
+              request(ExperimentalPaths.toolIDs, directory),
+              request(ExperimentalPaths.worktree, directory),
+              request(ExperimentalPaths.resource, directory),
+              request(ExperimentalPaths.sddSchema, directory),
+              request(ExperimentalPaths.sddSnapshot, directory),
+            ],
+            { concurrency: "unbounded" },
+          )
 
         expect(consoleState.status).toBe(200)
         expect(yield* json(consoleState)).toEqual({
@@ -183,6 +186,18 @@ describe("experimental HttpApi", () => {
 
         expect(resources.status).toBe(200)
         expect(yield* json(resources)).toEqual({})
+
+        expect(sddSchemas.status).toBe(200)
+        const sddSchemasBody = yield* json<{ schemas: Array<{ name: string }> }>(sddSchemas)
+        expect(sddSchemasBody.schemas.map((schema) => schema.name)).toContain("spec-driven")
+
+        expect(sddSnapshot.status).toBe(200)
+        expect(yield* json(sddSnapshot)).toEqual(
+          expect.objectContaining({
+            schemas: expect.any(Object),
+            changes: [],
+          }),
+        )
       }),
     {
       config: {

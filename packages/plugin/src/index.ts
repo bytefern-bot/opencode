@@ -216,6 +216,14 @@ export type ProviderHook = {
   models?: (provider: ProviderV2, ctx: ProviderHookContext) => Promise<Record<string, ModelV2>>
 }
 
+export type CommandDefinition = {
+  description?: string
+  agent?: string
+  model?: string
+  template: string
+  subtask?: boolean
+}
+
 /** @deprecated Use AuthOAuthResult instead. */
 export type AuthOuathResult = AuthOAuthResult
 
@@ -225,6 +233,9 @@ export interface Hooks {
   config?: (input: Config) => Promise<void>
   tool?: {
     [key: string]: ToolDefinition
+  }
+  command?: {
+    [key: string]: CommandDefinition
   }
   auth?: AuthHook
   provider?: ProviderHook

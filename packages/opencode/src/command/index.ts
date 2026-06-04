@@ -5,6 +5,7 @@ import { SessionID, MessageID } from "@/session/schema"
 import { Effect, Layer, Context, Schema } from "effect"
 import { Config } from "@/config/config"
 import { MCP } from "../mcp"
+import { Plugin } from "@/plugin"
 import { Skill } from "../skill"
 import { EventV2 } from "@opencode-ai/core/event"
 import PROMPT_INITIALIZE from "./template/initialize.txt"
@@ -31,7 +32,7 @@ export const Info = Schema.Struct({
   description: Schema.optional(Schema.String),
   agent: Schema.optional(Schema.String),
   model: Schema.optional(Schema.String),
-  source: Schema.optional(Schema.Literals(["command", "mcp", "skill"])),
+  source: Schema.optional(Schema.Literals(["command", "plugin", "mcp", "skill"])),
   // Some command templates are lazy promises from MCP prompt resolution.
   template: Schema.Unknown,
   subtask: Schema.optional(Schema.Boolean),
@@ -67,6 +68,7 @@ export const layer = Layer.effect(
   Effect.gen(function* () {
     const config = yield* Config.Service
     const mcp = yield* MCP.Service
+    const plugin = yield* Plugin.Service
     const skill = yield* Skill.Service
 
     const init = Effect.fn("Command.state")(function* (ctx: InstanceContext) {
@@ -106,6 +108,24 @@ export const layer = Layer.effect(
           },
           subtask: command.subtask,
           hints: hints(command.template),
+        }
+      }
+
+      for (const hooks of yield* plugin.list()) {
+        for (const [name, command] of Object.entries(hooks.command ?? {})) {
+          if (commands[name]) continue
+          commands[name] = {
+            name,
+            agent: command.agent,
+            model: command.model,
+            description: command.description,
+            source: "plugin",
+            get template() {
+              return command.template
+            },
+            subtask: command.subtask,
+            hints: hints(command.template),
+          }
         }
       }
 
@@ -175,6 +195,7 @@ export const layer = Layer.effect(
 export const defaultLayer = layer.pipe(
   Layer.provide(Config.defaultLayer),
   Layer.provide(MCP.defaultLayer),
+  Layer.provide(Plugin.defaultLayer),
   Layer.provide(Skill.defaultLayer),
 )
 
